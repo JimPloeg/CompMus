@@ -12,4 +12,4 @@ Key differences that can be noted here are:
 
 Week 8 : Included storyboard and visualisation on two specific songs
 
-[link to the storyboard](storyboard.rmd)
+[link to the storyboard](storyboard.Rmd)
