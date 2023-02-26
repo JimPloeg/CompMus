@@ -1,0 +1,117 @@
+---
+title: "Regional Differences in electronic music"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    storyboard: true
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+library(plotly)
+library(spotifyr)
+library(compmus)
+
+```
+
+### Introduction
+
+**Jim van der Ploeg**
+
+My Corpus will be modern electronic music, since it's the type of music I'm most familiar with. It's of course a relatively new type of music with much still unexplored and a lot has developed over even the past 20 years. What I think will be interesting to compare here is geographical differences: Western and Eastern cultures are of course very different of each other and this reflects in their music, but even between just Europe and America there should be plenty of differences that can be explored. 
+
+> Comparison of 2 DJ Sets
+
+This comparison graph compares different information on a DJ set from two different DJs, Martin Garrix and Shingo Nakamura. Martin Garrix is a Dutch DJ performing a set of the house music genre whereas Shingo Nakamura is a japanese DJ performing a set of the progressive house genre. 
+
+> Comparing two songs
+
+This comparison graph compares the former DJs's two most popular songs, Marting Garrix - Name of Love and Shingo Nakamura - Phenomena. 
+Dynamic time warping is used here to visualize how different the two songs are at each point of the song.
+
+
+
+### Comparison of 2 DJ Sets
+
+```{r}
+martinGarrix <- get_playlist_audio_features("", "37i9dQZF1DWYIvtWSbA6Aj")
+shingoNakamura <- get_playlist_audio_features("", "37i9dQZF1DX2CGcax0KY23")
+
+comparison <-
+  bind_rows(
+    martinGarrix |> mutate(category = "Martin Garrix DJ Mix"),
+    shingoNakamura |> mutate(category = "Shingo Nakamura DJ Mix")
+  )
+
+comparison |>
+  ggplot(aes(x = energy, y = danceability, size = loudness, colour = instrumentalness)) +
+  geom_point() +
+  facet_wrap(~category) +
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = c(0, 0.50, 1),
+    minor_breaks = NULL 
+  ) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = c(0, 0.50, 1),
+    minor_breaks = NULL
+  ) +
+  theme_minimal() +
+  labs(x = "Energy", y = "Danceability", colour = "Instrumentalness", size = "Loudness")
+```
+
+
+### Comparing two songs
+
+```{r}
+phenomena <-
+  get_tidy_audio_analysis("6CBnwiXpCc3RH8zQRlC6s4") |>
+  select(segments) |>
+  unnest(segments) |>
+  select(start, duration, pitches)
+
+name_of_love <-
+  get_tidy_audio_analysis("23L5CiUhw2jV1OIMwthR3S") |>
+  select(segments) |>
+  unnest(segments) |>
+  select(start, duration, pitches)
+
+compmus_long_distance(
+  phenomena |> mutate(pitches = map(pitches, compmus_normalise, "manhattan")),
+  name_of_love |> mutate(pitches = map(pitches, compmus_normalise, "manhattan")),
+  feature = pitches,
+  method = "euclidean"
+) |>
+  ggplot(
+    aes(
+      x = xstart + xduration / 2,
+      width = xduration,
+      y = ystart + yduration / 2,
+      height = yduration,
+      fill = d
+    )
+  ) +
+  geom_tile() +
+  coord_equal() +
+  labs(x = "Phenomena", y = "Name of love") +
+  theme_minimal() +
+  scale_fill_viridis_c(guide = NULL)
+```
+
+### Conclusion
+> Comparison of 2 DJ Sets
+
+Key differences that can be noted here are:
+
+* The instrumentalness; Shingo Nakamura has a significantly higher instrumentalness in his DJ Set.
+* The Energy level: Shingo Nakamura has a significantly higher energy level on average
+
+> Comparing two songs
+
+The darker the coloring, the more similar the songs are in tone at that point in time. This would indicate that most of the song stays quite similar in tone but around the middle especially the two songs are very different in tone. Reason for this could be that at around that point int time the beat drops for 'In the Name of Love', while Phenomena stays a lot more constant in terms of tone.
