@@ -1,5 +1,5 @@
 ---
-title: "Regional Differences in electronic music"
+title: "Differences in Electronic Dance Music"
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
@@ -25,15 +25,11 @@ library(compmus)
 
 My Corpus will be modern electronic music, since it's the type of music I'm most familiar with. It's of course a relatively new type of music with much still unexplored and a lot has developed over even the past 20 years. What I think will be interesting to compare here is geographical differences: Western and Eastern cultures are of course very different of each other and this reflects in their music, but even between just Europe and America there should be plenty of differences that can be explored. 
 
-> Comparison of 2 DJ Sets
+The Corpus for this project was the music of two different artists in the EDM (Electronic Dance Music) Scene. 
+The first artist is Martin Garrix, a well-known dutch DJ with 23 million monthly listeners who primarily makes house music for the mainstream public but also branches out to other types of sound such as pop music.
+The second artist is Shingo Nakamura, a lesser known DJ from Japan with 200.000 montly listeners who almost exclusively releases progressive house music and mixes.
 
-This comparison graph compares different information on a DJ set from two different DJs, Martin Garrix and Shingo Nakamura. Martin Garrix is a Dutch DJ performing a set of the house music genre whereas Shingo Nakamura is a japanese DJ performing a set of the progressive house genre. 
-
-> Comparing two songs
-
-This comparison graph compares the former DJs's two most popular songs, Marting Garrix - Name of Love and Shingo Nakamura - Phenomena. 
-Dynamic time warping is used here to visualize how different the two songs are at each point of the song.
-
+The idea here is to see if there are recognizable differences between the music of the two artists and how much these differences can be explained by the differences between the artists: Although they are both EDM DJs, they come from different countries, release slightly different genres of music and have a large difference in their following.
 
 
 ### Comparison of 2 DJ Sets
@@ -48,7 +44,7 @@ comparison <-
     shingoNakamura |> mutate(category = "Shingo Nakamura DJ Mix")
   )
 
-comparison |>
+p <- comparison %>%
   ggplot(aes(x = energy, y = danceability, size = loudness, colour = instrumentalness)) +
   geom_point() +
   facet_wrap(~category) +
@@ -64,10 +60,19 @@ comparison |>
   ) +
   theme_minimal() +
   labs(x = "Energy", y = "Danceability", colour = "Instrumentalness", size = "Loudness")
+
+ggplotly(p)
+
 ```
 
+***
 
-### Comparing two songs
+Key differences that can be noted here are:
+
+* The instrumentalness; Shingo Nakamura has a significantly higher instrumentalness in his DJ Set.
+* The Energy level: Shingo Nakamura has a significantly higher energy level on average
+
+### Comparing the chromagrams of two songs
 
 ```{r}
 phenomena <-
@@ -76,42 +81,229 @@ phenomena <-
   unnest(segments) |>
   select(start, duration, pitches)
 
+phenomena |>
+  mutate(pitches = map(pitches, compmus_normalise, "euclidean")) |>
+  compmus_gather_chroma() |> 
+  ggplot(
+    aes(
+      x = start + duration / 2,
+      width = duration,
+      y = pitch_class,
+      fill = value
+    )
+  ) +
+  geom_tile() +
+  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
+  theme_minimal() +
+  ggtitle("Shingo Nakamura - Phenomena") +
+  scale_fill_viridis_c()
+
+
 name_of_love <-
   get_tidy_audio_analysis("23L5CiUhw2jV1OIMwthR3S") |>
   select(segments) |>
   unnest(segments) |>
   select(start, duration, pitches)
 
-compmus_long_distance(
-  phenomena |> mutate(pitches = map(pitches, compmus_normalise, "manhattan")),
-  name_of_love |> mutate(pitches = map(pitches, compmus_normalise, "manhattan")),
-  feature = pitches,
-  method = "euclidean"
-) |>
+name_of_love |>
+  mutate(pitches = map(pitches, compmus_normalise, "euclidean")) |>
+  compmus_gather_chroma() |> 
   ggplot(
     aes(
-      x = xstart + xduration / 2,
-      width = xduration,
-      y = ystart + yduration / 2,
-      height = yduration,
-      fill = d
+      x = start + duration / 2,
+      width = duration,
+      y = pitch_class,
+      fill = value
     )
   ) +
   geom_tile() +
-  coord_equal() +
-  labs(x = "Phenomena", y = "Name of love") +
+  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
   theme_minimal() +
-  scale_fill_viridis_c(guide = NULL)
+  ggtitle("Martin Garrix - In the Name of Love") +
+  scale_fill_viridis_c()
+
 ```
 
+***
+
+* When comparing the artists' two most popular songs, 'In the Name of Love' for Martin Garrix and Phenomena for Shingo Nakamura, we can see a clear difference in the way the chords are used: whereas Shingo Nakamura's phenomena consistently stays in the C key, the main key of 'In the Name of Love' isn't quite as clear. 'In the Name of Love' uses G-sharp the most in the middle of the song (where the beat drops) along with F-sharp, but for the rest of the song the main chord isn't as visible.
+
+
+### Timbre Comparison
+```{r}
+name_of_love_timbre <-
+  get_tidy_audio_analysis("23L5CiUhw2jV1OIMwthR3S") |>
+  compmus_align(bars, segments) |>
+  select(bars) |> 
+  unnest(bars) |> 
+  mutate(
+    pitches =
+      map(segments,
+          compmus_summarise, pitches,
+          method = "rms", norm = "euclidean"
+      )
+  ) |>
+  mutate(
+    timbre =
+      map(segments,
+          compmus_summarise, timbre,
+          method = "rms", norm = "euclidean"
+      )
+  )
+
+timbre2 <- name_of_love_timbre %>%
+  compmus_gather_timbre() |>
+  ggplot(
+    aes(
+      x = start + duration / 2,
+      width = duration,
+      y = basis,
+      fill = value
+    )
+  ) +
+  geom_tile() +
+  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
+  scale_fill_viridis_c() +
+  ggtitle("Shingo Nakamura - Phenomena & Martin Garrix - In the Name of Love") +
+  theme_classic()
+
+
+```
+
+```{r}
+phenomena_timbre <-
+  get_tidy_audio_analysis("6CBnwiXpCc3RH8zQRlC6s4") |>
+  compmus_align(bars, segments) |>
+  select(bars) |> 
+  unnest(bars) |> 
+  mutate(
+    pitches =
+      map(segments,
+          compmus_summarise, pitches,
+          method = "rms", norm = "euclidean"
+      )
+  ) |>
+  mutate(
+    timbre =
+      map(segments,
+          compmus_summarise, timbre,
+          method = "rms", norm = "euclidean"
+      )
+  )
+
+timbre1 <- phenomena_timbre %>%
+  compmus_gather_timbre() |>
+  ggplot(
+    aes(
+      x = start + duration / 2,
+      width = duration,
+      y = basis,
+      fill = value
+    )
+  ) +
+  geom_tile() +
+  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
+  scale_fill_viridis_c() +                
+  theme_classic()
+
+subplot(timbre1, timbre2)
+```
+
+***
+
+* It's more difficult to see differences here than the other comparisons, but they are there. Looking at Phenomena's Timbre magnitude levels throughout the song, c01 (loudness) appears to have a slightly higher magnitude than 'In the name of Love' has for its c01 values throughout the song. We can see the effect of the short slowed-down segment of Phenomena at the 70 second mark in this Timbre Analysis since the loudness has a lower magnitude at that point. There's also a large difference in c06 between the two songs: Phenomena has significantly higher levels for c06.
+
+
+### Comparing the artist highlight playlists
+
+```{r}
+
+martinGarrixFull <- get_playlist_audio_features("", "37i9dQZF1DX94qaYRnkufr") |>
+  slice(1:30) |>
+  add_audio_analysis()
+
+shingoNakamuraFull <- get_playlist_audio_features("", "37i9dQZF1DZ06evO31dbFf") |>
+  slice(1:30) |>
+  add_audio_analysis()
+
+tempo_comparison <-
+  martinGarrixFull |>
+  mutate(artist = "Martin Garrix") |>
+  bind_rows(shingoNakamuraFull |> mutate(artist = "Shingo Nakamura"))
+
+
+graph <- tempo_comparison %>%
+  mutate(
+    sections =
+      map(
+        sections,                                    # sections or segments
+        summarise_at,
+        vars(tempo, loudness, duration),             # features of interest
+        list(section_mean = mean, section_sd = sd)   # aggregation functions
+      )
+  ) |>
+  unnest(sections) |>
+  ggplot(
+    aes(
+      x = tempo,
+      y = duration / 60,
+      colour = artist
+    )
+  ) +
+  geom_point() +
+  geom_rug() +
+  theme_minimal() +
+  ylim(0, 10) +
+  labs(
+    x = "Mean Tempo (bpm)",
+    y = "Duration (minutes)",
+    colour = "Artist"
+  )
+
+ggplotly(graph)
+
+```
+
+***
+
+* Some clear differences between the two artists' songs can be recognized here. Most obvious is the difference in duration between the songs: All of Martin Garrix's songs are designed for pop radio and are cut to fit that 3 minute length radio stations are looking for. Shingo Nakamura's songs on the other hand sometimes have an extended duration of up to 10 minutes, with the ratio of 3-minute songs to longer songs being around 50/50. The other difference is found in the mean tempo (bpm): All but one of Shingo Nakamura's songs fall between the 118 to 128 bpm range. Martin Garrix's songs also mostly fall in this category, particularly between 125 and 128bpm (the most common tempo for house music). Martin Garrix however has more outliers that don't fall in this range, since not all of his music is necessarily house music.
+
+
+### Tempo Analysis of two songs
+
+```{r}
+tempo_phenomena <- get_tidy_audio_analysis("6CBnwiXpCc3RH8zQRlC6s4")
+tempo_phenomena |>
+  tempogram(window_size = 8, hop_size = 1, cyclic = TRUE) |>
+  ggplot(aes(x = time, y = bpm, fill = power)) +
+  geom_raster() +
+  scale_fill_viridis_c(guide = "none") +
+  labs(x = "Time (s)", y = "Tempo (BPM)") +
+  ggtitle("Shingo Nakamura - Phenomena") +
+  theme_classic()
+
+tempo_name_of_love <- get_tidy_audio_analysis("23L5CiUhw2jV1OIMwthR3S")
+tempo_name_of_love |>
+  tempogram(window_size = 8, hop_size = 1, cyclic = TRUE) |>
+  ggplot(aes(x = time, y = bpm, fill = power)) +
+  geom_raster() +
+  scale_fill_viridis_c(guide = "none") +
+  labs(x = "Time (s)", y = "Tempo (BPM)") +
+  ggtitle("Martin Garrix - In the Name of Love") +
+  theme_classic()
+
+```
+
+***
+
+* In this tempo analysis it is visible that aside from a small segment after around 70 seconds 'Phenomena' is consistently recognized as having 120bpm. The small segment that starts after 70 seconds is different from the rest of the song since it takes the tempo back down for a moment before picking back up from the tempo the song had before after a short while. Martin Garrix's 'In the Name of Love' on the other hand has a much less consistent tempo throughout the song. Although you can see that the general bpm is at 134bpm, this is not nearly as clear as the other song for the majority of the song and the tempo changes a lot more throughout the song.
+
+
 ### Conclusion
-> Comparison of 2 DJ Sets
 
-Key differences that can be noted here are:
+* Although this project compared just two different artists and their discography, some clear differences between their discography were visible throughout the different songs. 
+* Generally the songs from Shingo Nakamura had a higher instrumentalness and energy level, which can be explained respectively by the relative lack of absence of vocals in his discography compared to Martin Garrix's Discography and the overall higher loudness in Shingo Nakamura's songs. 
+* Another difference is the overal tempo: Shingo Nakamura has primarily progressive house tracks which have a very consistent tempo throughout the songs, while Martin Garrix has a lot more varied tempo both when looking at the tempo of each specific song and the tempo changes throughout the song, which can be explained by the greater variety of genres of electronic music that he makes.
+* If a classifier were to look at the two discographies, the duration would be a large factor in guessing whether a song is made by Martin Garrix or Shingo Nakamura: Whereas all of Martin Garrix's songs have a duration of around 3 minutes, capping out at 4, Shingo Nakamura has just half of his songs at around this duration, with the other half ranging from 5 to up to 10 minutes length. This difference could have some correlation with Martin Garrix's popularity: Since his songs have to be designed to be played at radio stations they can't be too long.
 
-* The instrumentalness; Shingo Nakamura has a significantly higher instrumentalness in his DJ Set.
-* The Energy level: Shingo Nakamura has a significantly higher energy level on average
-
-> Comparing two songs
-
-The darker the coloring, the more similar the songs are in tone at that point in time. This would indicate that most of the song stays quite similar in tone but around the middle especially the two songs are very different in tone. Reason for this could be that at around that point int time the beat drops for 'In the Name of Love', while Phenomena stays a lot more constant in terms of tone.
+* In conclusion, there are many differences between the two artists' discography, which can be explained by the different types of genres present in their music and their relative size as artists. Unfortunately, no clear influence of their country of origin on their music was identified in this comparison. Further research might further explain that and other influences on their music.

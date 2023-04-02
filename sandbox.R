@@ -1,69 +1,49 @@
 library(tidyverse)
 library(spotifyr)
 library(compmus)
+library(plotly)
 
-wood <-
-  get_tidy_audio_analysis("3z8h0TU7ReDPLIbEnYhWZb") |>
-  select(segments) |>
-  unnest(segments) |>
-  select(start, duration, pitches)
 
-wood |>
-  mutate(pitches = map(pitches, compmus_normalise, "euclidean")) |>
-  compmus_gather_chroma() |> 
+martinGarrix <- get_playlist_audio_features("", "37i9dQZF1DX94qaYRnkufr") |>
+  slice(1:30) |>
+  add_audio_analysis()
+
+shingoNakamura <- get_playlist_audio_features("", "37i9dQZF1DZ06evO31dbFf") |>
+  slice(1:30) |>
+  add_audio_analysis()
+
+tempo_comparison <-
+  martinGarrix |>
+  mutate(artist = "Martin Garrix") |>
+  bind_rows(shingoNakamura |> mutate(artist = "Shingo Nakamura"))
+
+
+graph <- tempo_comparison %>%
+  mutate(
+    sections =
+      map(
+        sections,                                    # sections or segments
+        summarise_at,
+        vars(tempo, loudness, duration),             # features of interest
+        list(section_mean = mean, section_sd = sd)   # aggregation functions
+      )
+  ) |>
+  unnest(sections) |>
   ggplot(
     aes(
-      x = start + duration / 2,
-      width = duration,
-      y = pitch_class,
-      fill = value
+      x = tempo,
+      y = duration / 60,
+      colour = artist
     )
   ) +
-  geom_tile() +
-  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
+  geom_point() +
+  geom_rug() +
   theme_minimal() +
-  scale_fill_viridis_c()
+  ylim(0, 5) +
+  labs(
+    x = "Mean Tempo (bpm)",
+    y = "Duration",
+    colour = "Artist"
+  )
 
-deafheaven <-
-  get_tidy_audio_analysis("1XIlhPjBt4udymVWzcPrwm") |>
-  select(segments) |>
-  unnest(segments) |>
-  select(start, duration, pitches)
-
-deafheaven |>
-  mutate(pitches = map(pitches, compmus_normalise, "euclidean")) |>
-  compmus_gather_chroma() |> 
-  ggplot(
-    aes(
-      x = start + duration / 2,
-      width = duration,
-      y = pitch_class,
-      fill = value
-    )
-  ) +
-  geom_tile() +
-  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
-  theme_minimal() +
-  scale_fill_viridis_c()
-
-cc <-
-  get_tidy_audio_analysis("3qL63QvSTHvC4Uw8eEhz4z") |>
-  select(segments) |>
-  unnest(segments) |>
-  select(start, duration, pitches)
-
-cc |>
-  mutate(pitches = map(pitches, compmus_normalise, "euclidean")) |>
-  compmus_gather_chroma() |> 
-  ggplot(
-    aes(
-      x = start + duration / 2,
-      width = duration,
-      y = pitch_class,
-      fill = value
-    )
-  ) +
-  geom_tile() +
-  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
-  theme_minimal() +
-  scale_fill_viridis_c()
+ggplotly(graph)
